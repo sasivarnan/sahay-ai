@@ -1,6 +1,6 @@
 import { z } from "zod"
 import { scenarios } from "../domain/model"
-import { DomainError } from "../domain/service"
+import { DomainError, operatorActor } from "../domain/service"
 import { responseText } from "../domain/response-text"
 import {
   matchesSecret,
@@ -65,7 +65,7 @@ export async function handleApi(request: Request): Promise<Response> {
       return json(await service.create(current.id, scenarioId), 201)
     }
     const match = path.match(
-      /^cases\/([a-f0-9-]{36})(?:\/(investigate|advance|reset|speech))?$/
+      /^cases\/([a-f0-9-]{36})(?:\/(investigate|advance|reset|speech|messages))?$/
     )
     if (match) {
       const [, id, action] = match
@@ -73,6 +73,15 @@ export async function handleApi(request: Request): Promise<Response> {
         return json(await service.get(id, current.id))
       if (request.method === "POST" && action === "investigate")
         return json(await service.investigate(id, current.id))
+      if (request.method === "POST" && action === "messages") {
+        const { content } = z
+          .object({ content: z.string().trim().min(1).max(4000) })
+          .strict()
+          .parse(await request.json())
+        return json(
+          await service.customerSupportMessage(id, current.id, content)
+        )
+      }
       if (
         request.method === "POST" &&
         (action === "advance" || action === "reset")
@@ -251,6 +260,7 @@ async function handleAdmin(request: Request, path: string): Promise<Response> {
     return json({ role: "operator" })
   }
   await requireOperator(request)
+  const actor = operatorActor(current.id)
   if (path === "lock" && request.method === "POST") {
     await repository.transact((state) => {
       state.sessions[current.id].role = "customer"
@@ -268,17 +278,32 @@ async function handleAdmin(request: Request, path: string): Promise<Response> {
       })
       .parse(await request.json())
     return json(
-      await service.decide(
-        data.caseId,
-        data.proposalId,
-        data.approve,
-        `operator:${current.id}`
-      )
+      await service.decide(data.caseId, data.proposalId, data.approve, actor)
     )
   }
-  const match = path.match(/^cases\/([a-f0-9-]{36})\/(advance|reset)$/)
+  const match = path.match(
+    /^cases\/([a-f0-9-]{36})(?:\/(advance|reset|messages|resolve))?$/
+  )
+  if (match && request.method === "GET" && !match[2])
+    return json(await service.operatorGet(match[1]))
   if (match && request.method === "POST") {
     const [, id, action] = match
+    if (action === "messages") {
+      const { content } = z
+        .object({ content: z.string().trim().min(1).max(2000) })
+        .strict()
+        .parse(await request.json())
+      return json(await service.supportReply(id, content, actor))
+    }
+    if (action === "resolve") {
+      const { summary } = z
+        .object({ summary: z.string().trim().min(1).max(1000) })
+        .strict()
+        .parse(await request.json())
+      return json(await service.resolveBySupport(id, summary, actor))
+    }
+    if (action !== "advance" && action !== "reset")
+      throw new DomainError(404, "Admin endpoint not found.")
     const item = await service.operatorGet(id)
     if (action === "reset") return json(await service.reset(id, item.ownerId))
     await service.runDueJobs(id, item.ownerId)

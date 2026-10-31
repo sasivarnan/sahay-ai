@@ -35,6 +35,9 @@ export function DemoControls({
       void client.invalidateQueries({ queryKey: ["team-cases"] })
       void client.invalidateQueries({ queryKey: ["chats"] })
       void client.invalidateQueries({ queryKey: ["case", item.id] })
+      if (name === "advance")
+        void client.invalidateQueries({ queryKey: ["admin-case", item.id] })
+      else client.removeQueries({ queryKey: ["admin-case", item.id] })
       if (name === "reset") onReset()
     },
   })

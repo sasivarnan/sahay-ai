@@ -23,6 +23,8 @@ import { Route as ChatsIndexRouteImport } from './routes/chats.index'
 import { Route as ChatsChatIdRouteImport } from './routes/chats.$chatId'
 import { Route as CustomerIndexRouteImport } from './routes/customer.index'
 import { Route as CustomerChatsRouteImport } from './routes/customer.chats'
+import { Route as AdminCasesIndexRouteImport } from './routes/admin.cases.index'
+import { Route as AdminCasesCaseIdRouteImport } from './routes/admin.cases.$caseId'
 import { Route as CustomerChatsIndexRouteImport } from './routes/customer.chats.index'
 import { Route as CustomerChatsChatIdRouteImport } from './routes/customer.chats.$chatId'
 
@@ -96,6 +98,16 @@ const CustomerChatsRoute = CustomerChatsRouteImport.update({
   path: '/chats',
   getParentRoute: () => CustomerRoute,
 } as any)
+const AdminCasesIndexRoute = AdminCasesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminCasesRoute,
+} as any)
+const AdminCasesCaseIdRoute = AdminCasesCaseIdRouteImport.update({
+  id: '/$caseId',
+  path: '/$caseId',
+  getParentRoute: () => AdminCasesRoute,
+} as any)
 const CustomerChatsIndexRoute = CustomerChatsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -114,7 +126,7 @@ export interface FileRoutesByFullPath {
   '/customer': typeof CustomerRouteWithChildren
   '/results': typeof ResultsRoute
   '/team': typeof TeamRoute
-  '/admin/cases': typeof AdminCasesRoute
+  '/admin/cases': typeof AdminCasesRouteWithChildren
   '/admin/results': typeof AdminResultsRoute
   '/api/$': typeof ApiSplatRoute
   '/chats/$chatId': typeof ChatsChatIdRoute
@@ -122,21 +134,24 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AdminIndexRoute
   '/chats/': typeof ChatsIndexRoute
   '/customer/': typeof CustomerIndexRoute
+  '/admin/cases/$caseId': typeof AdminCasesCaseIdRoute
   '/customer/chats/$chatId': typeof CustomerChatsChatIdRoute
+  '/admin/cases/': typeof AdminCasesIndexRoute
   '/customer/chats/': typeof CustomerChatsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/results': typeof ResultsRoute
   '/team': typeof TeamRoute
-  '/admin/cases': typeof AdminCasesRoute
   '/admin/results': typeof AdminResultsRoute
   '/api/$': typeof ApiSplatRoute
   '/chats/$chatId': typeof ChatsChatIdRoute
   '/admin': typeof AdminIndexRoute
   '/chats': typeof ChatsIndexRoute
   '/customer': typeof CustomerIndexRoute
+  '/admin/cases/$caseId': typeof AdminCasesCaseIdRoute
   '/customer/chats/$chatId': typeof CustomerChatsChatIdRoute
+  '/admin/cases': typeof AdminCasesIndexRoute
   '/customer/chats': typeof CustomerChatsIndexRoute
 }
 export interface FileRoutesById {
@@ -147,7 +162,7 @@ export interface FileRoutesById {
   '/customer': typeof CustomerRouteWithChildren
   '/results': typeof ResultsRoute
   '/team': typeof TeamRoute
-  '/admin/cases': typeof AdminCasesRoute
+  '/admin/cases': typeof AdminCasesRouteWithChildren
   '/admin/results': typeof AdminResultsRoute
   '/api/$': typeof ApiSplatRoute
   '/chats/$chatId': typeof ChatsChatIdRoute
@@ -155,7 +170,9 @@ export interface FileRoutesById {
   '/admin/': typeof AdminIndexRoute
   '/chats/': typeof ChatsIndexRoute
   '/customer/': typeof CustomerIndexRoute
+  '/admin/cases/$caseId': typeof AdminCasesCaseIdRoute
   '/customer/chats/$chatId': typeof CustomerChatsChatIdRoute
+  '/admin/cases/': typeof AdminCasesIndexRoute
   '/customer/chats/': typeof CustomerChatsIndexRoute
 }
 export interface FileRouteTypes {
@@ -175,21 +192,24 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/chats/'
     | '/customer/'
+    | '/admin/cases/$caseId'
     | '/customer/chats/$chatId'
+    | '/admin/cases/'
     | '/customer/chats/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/results'
     | '/team'
-    | '/admin/cases'
     | '/admin/results'
     | '/api/$'
     | '/chats/$chatId'
     | '/admin'
     | '/chats'
     | '/customer'
+    | '/admin/cases/$caseId'
     | '/customer/chats/$chatId'
+    | '/admin/cases'
     | '/customer/chats'
   id:
     | '__root__'
@@ -207,7 +227,9 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/chats/'
     | '/customer/'
+    | '/admin/cases/$caseId'
     | '/customer/chats/$chatId'
+    | '/admin/cases/'
     | '/customer/chats/'
   fileRoutesById: FileRoutesById
 }
@@ -321,6 +343,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CustomerChatsRouteImport
       parentRoute: typeof CustomerRoute
     }
+    '/admin/cases/': {
+      id: '/admin/cases/'
+      path: '/'
+      fullPath: '/admin/cases/'
+      preLoaderRoute: typeof AdminCasesIndexRouteImport
+      parentRoute: typeof AdminCasesRoute
+    }
+    '/admin/cases/$caseId': {
+      id: '/admin/cases/$caseId'
+      path: '/$caseId'
+      fullPath: '/admin/cases/$caseId'
+      preLoaderRoute: typeof AdminCasesCaseIdRouteImport
+      parentRoute: typeof AdminCasesRoute
+    }
     '/customer/chats/': {
       id: '/customer/chats/'
       path: '/'
@@ -338,14 +374,28 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AdminCasesRouteChildren {
+  AdminCasesCaseIdRoute: typeof AdminCasesCaseIdRoute
+  AdminCasesIndexRoute: typeof AdminCasesIndexRoute
+}
+
+const AdminCasesRouteChildren: AdminCasesRouteChildren = {
+  AdminCasesCaseIdRoute: AdminCasesCaseIdRoute,
+  AdminCasesIndexRoute: AdminCasesIndexRoute,
+}
+
+const AdminCasesRouteWithChildren = AdminCasesRoute._addFileChildren(
+  AdminCasesRouteChildren,
+)
+
 interface AdminRouteChildren {
-  AdminCasesRoute: typeof AdminCasesRoute
+  AdminCasesRoute: typeof AdminCasesRouteWithChildren
   AdminResultsRoute: typeof AdminResultsRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
-  AdminCasesRoute: AdminCasesRoute,
+  AdminCasesRoute: AdminCasesRouteWithChildren,
   AdminResultsRoute: AdminResultsRoute,
   AdminIndexRoute: AdminIndexRoute,
 }

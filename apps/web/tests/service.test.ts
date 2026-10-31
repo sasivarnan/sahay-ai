@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest"
-import { CaseService, MemoryRepository } from "../src/domain/service"
+import {
+  CaseService,
+  MemoryRepository,
+  operatorActor,
+} from "../src/domain/service"
 
 function setup() {
   let time = new Date("2026-10-31T06:00:00Z")
@@ -94,6 +98,90 @@ describe("case decisions and action safety", () => {
     expect(
       await repository.transact((state) => Object.values(state.refunds).length)
     ).toBe(0)
+  })
+  it("lets the assigned officer reply and close a support case without creating a refund", async () => {
+    const { service, repository } = setup()
+    const item = await service.create("alice", "approval-required")
+    const pending = await service.investigate(item.id, "alice")
+    await expect(
+      service.supportReply(item.id, "I will review this case.", "officer")
+    ).rejects.toThrow("Take ownership")
+    await service.decide(item.id, pending.proposal!.id, false, "officer")
+    await expect(
+      service.supportReply(item.id, "Wrong officer", "other-officer")
+    ).rejects.toThrow("Another support officer")
+    await expect(
+      service.supportReply(item.id, "   ", "officer")
+    ).rejects.toThrow("Enter a reply")
+    await service.supportReply(
+      item.id,
+      "I have taken your case and will review the evidence.",
+      "officer"
+    )
+    const customer = await service.get(item.id, "alice")
+    expect(customer.assignedTo).toBe("officer")
+    expect(customer.messages.at(-1)).toMatchObject({
+      source: "support",
+      role: "assistant",
+      content: "I have taken your case and will review the evidence.",
+    })
+    await expect(
+      service.resolveBySupport(item.id, "Reviewed", "other-officer")
+    ).rejects.toThrow("Another support officer")
+    const closed = await service.resolveBySupport(
+      item.id,
+      "Customer agreed to close this support request without a refund.",
+      "officer"
+    )
+    expect(closed.status).toBe("resolved")
+    expect(closed.resolution).toMatchObject({
+      actor: "officer",
+      summary:
+        "Customer agreed to close this support request without a refund.",
+    })
+    expect(closed.messages.at(-1)?.source).toBe("support")
+    expect(closed.audit.at(-1)?.type).toBe("support_resolved")
+    expect(
+      await repository.transact((state) => Object.keys(state.refunds).length)
+    ).toBe(0)
+    await expect(
+      service.supportReply(item.id, "Late reply", "officer")
+    ).rejects.toThrow("Take ownership")
+    await expect(
+      service.resolveBySupport(item.id, "Repeated closure", "officer")
+    ).rejects.toThrow("Take ownership")
+  })
+  it("does not close a processing refund through the support resolution action", async () => {
+    const { service } = setup()
+    const item = await service.create("alice", "failed-recharge")
+    await service.investigate(item.id, "alice")
+    await expect(
+      service.resolveBySupport(item.id, "Refund is complete", "officer")
+    ).rejects.toThrow("Take ownership")
+    expect((await service.get(item.id, "alice")).status).toBe(
+      "refund_processing"
+    )
+  })
+  it("keeps officer session credentials out of case ownership and audit data", async () => {
+    const { service } = setup()
+    const sessionId = crypto.randomUUID()
+    const item = await service.create("alice", "approval-required")
+    const pending = await service.investigate(item.id, "alice")
+    await service.decide(
+      item.id,
+      pending.proposal!.id,
+      false,
+      `operator:${sessionId}`
+    )
+    const legacy = await service.get(item.id, "alice")
+    expect(legacy.assignedTo).toBe(operatorActor(sessionId))
+    expect(JSON.stringify(legacy)).not.toContain(sessionId)
+    const reply = await service.supportReply(
+      item.id,
+      "The assigned officer can still reply.",
+      operatorActor(sessionId)
+    )
+    expect(reply.messages.at(-1)?.source).toBe("support")
   })
   it("does not refund a payment with verified merchant credit", async () => {
     const { service, repository } = setup()

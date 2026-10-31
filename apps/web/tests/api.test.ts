@@ -227,6 +227,131 @@ describe("workspace access boundaries", () => {
       403
     )
   })
+  it("protects case details, officer replies, and support resolution behind admin access", async () => {
+    const cookie = responseCookie(await request("bootstrap", undefined, ""))
+    const item = await (
+      await request("chats", { scenarioId: "approval-required" }, cookie)
+    ).json()
+    expect(
+      (await request(`admin/cases/${item.id}`, undefined, cookie)).status
+    ).toBe(403)
+    expect(
+      (
+        await request(
+          `admin/cases/${item.id}/messages`,
+          { content: "Forged reply" },
+          cookie
+        )
+      ).status
+    ).toBe(403)
+    expect(
+      (
+        await request(
+          `admin/cases/${item.id}/resolve`,
+          { summary: "Forged resolution" },
+          cookie
+        )
+      ).status
+    ).toBe(403)
+    const officer = responseCookie(
+      await request("admin/session", undefined, "")
+    )
+    await request("admin/unlock", { code: "test-officer-code" }, officer)
+    expect(
+      (await request(`admin/cases/${item.id}`, undefined, officer)).status
+    ).toBe(200)
+    const pending = await (
+      await request(`cases/${item.id}/investigate`, {}, cookie)
+    ).json()
+    await request(
+      "admin/decision",
+      { caseId: item.id, proposalId: pending.proposal.id, approve: false },
+      officer
+    )
+    expect(
+      (
+        await request(
+          `admin/cases/${item.id}/messages`,
+          { content: "  " },
+          officer
+        )
+      ).status
+    ).toBe(400)
+    const replied = await request(
+      `admin/cases/${item.id}/messages`,
+      { content: "I have reviewed your payment evidence." },
+      officer
+    )
+    expect(replied.status).toBe(200)
+    expect(
+      (
+        await (await request(`cases/${item.id}`, undefined, cookie)).json()
+      ).messages.at(-1)
+    ).toMatchObject({
+      source: "support",
+      content: "I have reviewed your payment evidence.",
+    })
+    const beforeReply = await replied.json()
+    expect(JSON.stringify(beforeReply)).not.toContain(officer.split("=")[1])
+    expect(
+      (
+        await request(
+          `cases/${item.id}/messages`,
+          { content: "Thank you. Please explain the outcome." },
+          cookie
+        )
+      ).status
+    ).toBe(200)
+    const conversation = await (
+      await request(`admin/cases/${item.id}`, undefined, officer)
+    ).json()
+    expect(conversation.messages.length).toBe(beforeReply.messages.length + 1)
+    expect(conversation.messages.at(-1)).toMatchObject({
+      role: "user",
+      source: "customer",
+      content: "Thank you. Please explain the outcome.",
+    })
+    expect(
+      (
+        await request(
+          `cases/${item.id}/messages`,
+          { content: "Wrong customer" },
+          customerCookie
+        )
+      ).status
+    ).toBe(404)
+    expect(
+      (
+        await request(
+          `admin/cases/${item.id}/resolve`,
+          {
+            summary:
+              "Customer agreed to close the support request. No refund was issued.",
+          },
+          officer
+        )
+      ).status
+    ).toBe(200)
+    const closed = await (
+      await request(`cases/${item.id}`, undefined, cookie)
+    ).json()
+    expect(closed.status).toBe("resolved")
+    expect(closed.refundId).toBeUndefined()
+    expect(closed.resolution.summary).toContain("No refund was issued")
+    expect(
+      (
+        await request(
+          `cases/${item.id}/messages`,
+          { content: "Late message" },
+          cookie
+        )
+      ).status
+    ).toBe(409)
+    await request("admin/lock", {}, officer)
+    expect(
+      (await request(`admin/cases/${item.id}`, undefined, officer)).status
+    ).toBe(403)
+  })
   it("forwards the requested committed voice version without caching session credentials", async () => {
     const configuration = {
       SARVAM_VOICE_ORG_ID: "voice-org",

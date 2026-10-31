@@ -89,6 +89,15 @@ function Conversation({ initial, current }: { initial: Case; current: Case }) {
     mutationFn: (name: "investigate") => api(`cases/${current.id}/${name}`, {}),
     onSuccess: refresh,
   })
+  const supportMessage = useMutation({
+    mutationFn: (content: string) =>
+      api<Case>(`cases/${current.id}/messages`, { content }),
+    onSuccess: (item) => {
+      client.setQueryData(caseOptions(current.id).queryKey, item)
+      setDraft("")
+      refresh()
+    },
+  })
   const savedIds = new Set(current.messages.map((message) => message.id))
   const streamMessages = chat.messages.filter(
     (message) => !savedIds.has(message.id)
@@ -148,7 +157,7 @@ function Conversation({ initial, current }: { initial: Case; current: Case }) {
       setSpeaking(false)
     }
   }
-  const busy = chat.isLoading || action.isPending
+  const busy = chat.isLoading || action.isPending || supportMessage.isPending
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <main className="flex min-w-0 flex-col">
@@ -250,9 +259,15 @@ function Conversation({ initial, current }: { initial: Case; current: Case }) {
                   className={`flex flex-col gap-1.5 ${message.role === "user" ? "items-end" : "items-start"}`}
                 >
                   {(index === 0 ||
-                    visible[index - 1].role !== message.role) && (
+                    visible[index - 1].role !== message.role ||
+                    (visible[index - 1].source === "support") !==
+                      (message.source === "support")) && (
                     <span className="text-xs font-medium text-muted-foreground">
-                      {message.role === "user" ? "You" : "Sahay"}
+                      {message.role === "user"
+                        ? "You"
+                        : message.source === "support"
+                          ? "Support officer"
+                          : "Sahay"}
                     </span>
                   )}
                   <Card
@@ -292,10 +307,16 @@ function Conversation({ initial, current }: { initial: Case; current: Case }) {
             </div>
             <div className="sticky bottom-0 bg-background px-5 py-4 md:px-8">
               <div className="mx-auto flex max-w-3xl flex-col gap-3">
-                {(error || action.error || chat.error) && (
+                {(error ||
+                  action.error ||
+                  chat.error ||
+                  supportMessage.error) && (
                   <Alert variant="destructive">
                     <AlertDescription>
-                      {error || action.error?.message || chat.error?.message}
+                      {error ||
+                        action.error?.message ||
+                        chat.error?.message ||
+                        supportMessage.error?.message}
                     </AlertDescription>
                   </Alert>
                 )}
@@ -314,6 +335,10 @@ function Conversation({ initial, current }: { initial: Case; current: Case }) {
                     event.preventDefault()
                     if (!draft.trim() || busy) return
                     const text = draft.trim()
+                    if (current.status === "human_owned") {
+                      supportMessage.mutate(text)
+                      return
+                    }
                     setDraft("")
                     void chat
                       .sendMessage(text)
@@ -322,8 +347,16 @@ function Conversation({ initial, current }: { initial: Case; current: Case }) {
                   className="flex items-end gap-2"
                 >
                   <Textarea
-                    aria-label="Message Sahay"
-                    placeholder="Message Sahay in your language…"
+                    aria-label={
+                      current.status === "human_owned"
+                        ? "Message support officer"
+                        : "Message Sahay"
+                    }
+                    placeholder={
+                      current.status === "human_owned"
+                        ? "Message your support officer…"
+                        : "Message Sahay in your language…"
+                    }
                     value={draft}
                     maxLength={4000}
                     onChange={(event) => setDraft(event.target.value)}

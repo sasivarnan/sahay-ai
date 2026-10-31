@@ -48,25 +48,34 @@ export function Shell({
   })
   const client = useQueryClient()
   const location = useLocation()
+  const caseWorkspace =
+    admin && /^\/admin\/cases\/[^/]+\/?$/.test(location.pathname)
   const lock = useMutation({
     mutationFn: () => api("admin/lock", {}),
     onSuccess: () => {
       client.setQueryData(adminSessionOptions.queryKey, { role: "customer" })
       client.removeQueries({ queryKey: ["team-cases"] })
+      client.removeQueries({ queryKey: ["admin-case"] })
     },
   })
   return (
-    <SidebarProvider>
-      <Sidebar>
-        <SidebarHeader className="gap-4 px-5 py-6">
+    <SidebarProvider
+      key={caseWorkspace ? "admin-case" : "workspace"}
+      defaultOpen={!caseWorkspace}
+    >
+      <Sidebar collapsible={admin ? "icon" : "offcanvas"}>
+        <SidebarHeader className="gap-4 px-5 py-6 group-data-[collapsible=icon]:p-2">
           <Link
             to={admin ? "/admin/cases" : "/customer/chats"}
+            aria-label={
+              admin ? "Sahay AI admin workspace" : "Sahay AI customer support"
+            }
             className="flex items-center gap-3"
           >
-            <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground group-data-[collapsible=icon]:size-8">
               <RiShieldCheckLine size={22} />
             </span>
-            <span>
+            <span className="group-data-[collapsible=icon]:hidden">
               <span className="block text-xl font-semibold tracking-tight">
                 Sahay AI
               </span>
@@ -84,7 +93,8 @@ export function Shell({
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     render={<Link to="/admin/cases" />}
-                    isActive={location.pathname === "/admin/cases"}
+                    tooltip="Case inbox"
+                    isActive={location.pathname.startsWith("/admin/cases")}
                   >
                     <RiInbox2Line />
                     <span>Case inbox</span>
@@ -93,6 +103,7 @@ export function Shell({
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     render={<Link to="/admin/results" />}
+                    tooltip="Results"
                     isActive={location.pathname === "/admin/results"}
                   >
                     <RiBarChartBoxLine />
@@ -148,16 +159,19 @@ export function Shell({
             </>
           )}
         </SidebarContent>
-        <SidebarFooter className="gap-3 p-5">
+        <SidebarFooter className="gap-3 p-5 group-data-[collapsible=icon]:p-2">
           {admin && adminSession.data?.role === "operator" && (
             <Button
               variant="ghost"
-              className="h-11 justify-start"
+              className="h-11 justify-start group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+              aria-label="Lock workspace"
               onClick={() => lock.mutate()}
               disabled={lock.isPending}
             >
               <RiLockLine />
-              Lock workspace
+              <span className="group-data-[collapsible=icon]:hidden">
+                Lock workspace
+              </span>
             </Button>
           )}
           {lock.error && (
@@ -165,9 +179,15 @@ export function Shell({
               {lock.error.message}
             </p>
           )}
-          <p className="text-xs leading-relaxed text-muted-foreground">
+          <p className="text-xs leading-relaxed text-muted-foreground group-data-[collapsible=icon]:hidden">
             Demo · payment data, policies, and actions are simulated.
           </p>
+          <span
+            className="hidden text-center text-[10px] text-muted-foreground group-data-[collapsible=icon]:block"
+            title="Demo: payment data, policies, and actions are simulated."
+          >
+            Demo
+          </span>
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>

@@ -2,7 +2,7 @@
 
 ## Description
 
-Sahay AI is a payment support prototype for TeamApex. Customers can use text or voice to check a payment and request an investigation. Support staff can review cases, approve refund proposals, and see recorded results.
+Sahay AI is a payment support prototype for TeamApex. Customers can use text or voice to check a payment and request an investigation. Support officers can review evidence, approve refund proposals, take ownership, reply to customers, and record case resolutions.
 
 Text and voice use the same case rules and records. Sarvam provides the language and speech services.
 
@@ -11,6 +11,10 @@ Text and voice use the same case rules and records. Sarvam provides the language
 ## Features
 
 - Separate customer and admin workspaces.
+- A case inbox and a separate case page with evidence and officer actions.
+- A floating customer chat window that keeps its draft when minimised.
+- A portrait tablet layout with case actions above the payment evidence.
+- Officer and customer replies after takeover, with a recorded support resolution.
 - Saved chats, payment evidence, and case history.
 - Text support in the customer's language.
 - A separate Voice tab with Aparna, call status, duration, and mute controls.
@@ -180,7 +184,10 @@ flowchart TD
     Decision -->|"Merchant received payment"| Close["Close with evidence"]
     Decision -->|"Approval required"| Review["Admin reviews exact proposal"]
     Review -->|"Approved"| Refund["Start refund once"]
-    Review -->|"Rejected"| Support["Keep case with support"]
+    Review -->|"Rejected"| Support["Officer takes ownership"]
+    Support --> Chat["Officer and customer exchange text messages"]
+    Chat --> Resolution["Officer records the agreed outcome"]
+    Resolution --> SupportClose["Close support request without issuing a refund"]
     Decision -->|"Refund permitted"| Refund
     Decision -->|"Status unavailable"| Wait["Save follow-up job"]
     Refund --> Wait
@@ -199,6 +206,28 @@ flowchart TD
 6. To repeat a case, use **Demo controls → Reset case**. Reset affects only the selected case and is blocked during an active text run.
 
 Only admin can reset a case or advance demo time. A refund in progress is not a completed refund.
+
+## Support officer workflow
+
+| Page | Use |
+| --- | --- |
+| `/admin/cases` | Search cases and filter by **Needs review** or **With support**. |
+| `/admin/cases/$caseId` | Review the selected case, payment evidence, action history, and officer actions. |
+
+The case details are the main page. The left navigation starts as an icon bar. On desktop, actions appear beside the evidence. On portrait tablets, actions appear above the payment summary and evidence cards. Details stay visible without a drawer or horizontal scrolling.
+
+### Show support takeover
+
+1. Request an investigation for the ₹4,800 payment in the customer window.
+2. In the admin inbox, select **Needs review** and open the case.
+3. Review the evidence. Select **Reject and take ownership**. The case changes to **With support**, and the floating chat opens.
+4. Send an officer reply. The reply appears in the customer conversation with the label **Support officer**.
+5. Send a text reply from the customer window. After takeover, new customer text messages go to the officer instead of the AI chat.
+6. Select **Resolve case** and enter the agreed outcome. The customer receives the resolution, and officer replies are disabled for the closed case. This action does not issue a refund.
+
+Use **Customer chat** at the bottom right to open the floating conversation. Use its minimise button to return to the full case view. The draft stays in place while chat is minimised. New customer messages show a count on the chat button.
+
+Only the assigned officer can reply or resolve a case after takeover. Refund approval remains a separate action. Returning to the inbox keeps the search, status filter, and list scroll position.
 
 ## Follow-up jobs
 
@@ -219,7 +248,7 @@ pnpm test
 pnpm build
 ```
 
-The tests cover case rules, approval checks, duplicate actions, session access, saved records, voice payment facts, and call cleanup.
+The tests cover case rules, approval checks, duplicate actions, session access, saved records, voice payment facts, call cleanup, officer ownership, customer replies, and support resolution without a refund.
 
 See [validation results and limits](docs/CORE-VALIDATION.md).
 
@@ -239,6 +268,7 @@ See [validation results and limits](docs/CORE-VALIDATION.md).
 
 - Payment systems and results are simulated.
 - Admin access uses a demo code, not production identity management.
+- Officer takeover provides text chat. It does not transfer a live voice call to a person.
 - The UI uses fixed shadcn screens. A general A2UI renderer is not included.
 - External PostgreSQL and the Cloudflare application runtime are not verified yet.
 - The public voice tool tunnel is not a full application deployment.

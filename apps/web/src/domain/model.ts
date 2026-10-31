@@ -15,7 +15,7 @@ export type Message = {
   role: "user" | "assistant"
   content: string
   createdAt: string
-  source: "customer" | "sarvam" | "simulation" | "system" | "voice"
+  source: "customer" | "sarvam" | "simulation" | "system" | "voice" | "support"
 }
 export type Evidence = { source: string; result: string; checkedAt: string }
 export type AuditEvent = {
@@ -60,6 +60,8 @@ export type Case = {
   followUpAt?: string
   investigationCount: number
   lostResponseRecovered: boolean
+  assignedTo?: string
+  resolution?: { summary: string; actor: string; at: string }
 }
 export type Job = {
   id: string

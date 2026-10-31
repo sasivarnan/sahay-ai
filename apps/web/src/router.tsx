@@ -9,6 +9,10 @@ export function getRouter() {
     routeTree,
     context: { queryClient },
     scrollRestoration: true,
+    getScrollRestorationKey: (location) =>
+      location.pathname.replace(/\/$/, "") === "/admin/cases"
+        ? `/admin/cases${location.searchStr}`
+        : location.state.__TSR_key!,
     defaultPreload: "intent",
   })
 }

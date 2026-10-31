@@ -21,6 +21,12 @@ export class DomainError extends Error {
 export interface Repository {
   transact<T>(operation: (state: State) => T | Promise<T>): Promise<T>
 }
+export const operatorActor = (sessionId: string) =>
+  `operator:${createHash("sha256").update(sessionId).digest("hex").slice(0, 24)}`
+const normalizeActor = (actor: string) =>
+  /^operator:[a-f0-9-]{36}$/i.test(actor)
+    ? operatorActor(actor.slice(9))
+    : actor
 export class MemoryRepository implements Repository {
   private state = emptyState()
   private tail: Promise<unknown> = Promise.resolve()
@@ -57,6 +63,15 @@ export class CaseService {
   private now() {
     return this.clock().toISOString()
   }
+  private normalizeActors(item: Case) {
+    if (item.assignedTo) item.assignedTo = normalizeActor(item.assignedTo)
+    if (item.proposal?.decidedBy)
+      item.proposal.decidedBy = normalizeActor(item.proposal.decidedBy)
+    if (item.resolution)
+      item.resolution.actor = normalizeActor(item.resolution.actor)
+    for (const event of item.audit) event.actor = normalizeActor(event.actor)
+    return item
+  }
   private audit(
     item: Case,
     type: string,
@@ -76,7 +91,7 @@ export class CaseService {
   private message(
     item: Case,
     content: string,
-    source: "system" | "simulation" = "system"
+    source: "system" | "simulation" | "support" = "system"
   ) {
     item.messages.push({
       id: randomUUID(),
@@ -90,7 +105,7 @@ export class CaseService {
     const item = state.cases[id]
     if (!item || item.ownerId !== owner)
       throw new DomainError(404, "Case not found.")
-    return item
+    return this.normalizeActors(item)
   }
   async create(ownerId: string, scenarioId: ScenarioId) {
     return this.repository.transact((state) => {
@@ -99,7 +114,7 @@ export class CaseService {
       const existing = Object.values(state.cases).find(
         (item) => item.ownerId === ownerId && item.scenarioId === scenarioId
       )
-      if (existing) return existing
+      if (existing) return this.normalizeActors(existing)
       const item: Case = {
         ...scenario,
         id: randomUUID(),
@@ -134,6 +149,7 @@ export class CaseService {
     return this.repository.transact((state) =>
       Object.values(state.cases)
         .filter((item) => !ownerId || item.ownerId === ownerId)
+        .map((item) => this.normalizeActors(item))
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     )
   }
@@ -144,7 +160,7 @@ export class CaseService {
     return this.repository.transact((state) => {
       const item = state.cases[id]
       if (!item) throw new DomainError(404, "Case not found.")
-      return item
+      return this.normalizeActors(item)
     })
   }
   private schedule(
@@ -309,11 +325,80 @@ export class CaseService {
       if (approve) this.executeRefund(state, item)
       else {
         item.status = "human_owned"
+        item.assignedTo = actor
         this.message(
           item,
           "The support officer did not approve the proposed refund. The case remains open with the human support team."
         )
       }
+      return item
+    })
+  }
+  private supportCase(state: State, id: string, actor: string) {
+    const item = state.cases[id]
+    if (!item) throw new DomainError(404, "Case not found.")
+    this.normalizeActors(item)
+    if (item.status !== "human_owned")
+      throw new DomainError(
+        409,
+        "Take ownership before replying or closing this case."
+      )
+    if (item.assignedTo && item.assignedTo !== actor)
+      throw new DomainError(409, "Another support officer owns this case.")
+    item.assignedTo = actor
+    return item
+  }
+  async supportReply(id: string, content: string, actor: string) {
+    const text = content.trim()
+    if (!text || text.length > 2000)
+      throw new DomainError(400, "Enter a reply of up to 2,000 characters.")
+    return this.repository.transact((state) => {
+      const item = this.supportCase(state, id, actor)
+      this.message(item, text, "support")
+      this.audit(
+        item,
+        "support_replied",
+        "The support officer sent a customer reply.",
+        actor
+      )
+      return item
+    })
+  }
+  async customerSupportMessage(id: string, ownerId: string, content: string) {
+    const text = content.trim()
+    if (!text || text.length > 4000)
+      throw new DomainError(400, "Enter a message of up to 4,000 characters.")
+    return this.repository.transact((state) => {
+      const item = this.owned(state, id, ownerId)
+      if (item.status !== "human_owned")
+        throw new DomainError(
+          409,
+          "This case is not with support. Reload the case before sending."
+        )
+      item.messages.push({
+        id: randomUUID(),
+        role: "user",
+        content: text,
+        source: "customer",
+        createdAt: this.now(),
+      })
+      item.updatedAt = this.now()
+      return item
+    })
+  }
+  async resolveBySupport(id: string, summary: string, actor: string) {
+    const text = summary.trim()
+    if (!text || text.length > 1000)
+      throw new DomainError(
+        400,
+        "Enter a resolution of up to 1,000 characters."
+      )
+    return this.repository.transact((state) => {
+      const item = this.supportCase(state, id, actor)
+      item.status = "resolved"
+      item.resolution = { summary: text, actor, at: this.now() }
+      this.message(item, `Case closed by support. ${text}`, "support")
+      this.audit(item, "support_resolved", text, actor)
       return item
     })
   }

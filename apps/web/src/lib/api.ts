@@ -43,6 +43,13 @@ export const teamOptions = queryOptions({
   retry: false,
   refetchInterval: 3000,
 })
+export const adminCaseOptions = (id: string) =>
+  queryOptions({
+    queryKey: ["admin-case", id],
+    queryFn: () => api<Case>(`admin/cases/${id}`),
+    refetchInterval: 2000,
+    retry: false,
+  })
 
 export const adminSessionOptions = queryOptions({
   queryKey: ["admin-session"],

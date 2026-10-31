@@ -3,11 +3,13 @@
 ## Passed
 
 - Production frontend/server build and TypeScript checks.
-- 29 automated tests: case decisions, concurrent requests, duplicate refunds, stale approvals, rejection, unknown payment status, session isolation, reset protection, database restart, request validation, team authorization, separate workspace cookies, cross-session approval and follow-up, admin locking, protected demo controls, AG-UI stream boundaries, voice payment facts, voice version forwarding, and session cleanup.
+- 33 automated tests: case decisions, concurrent requests, duplicate refunds, stale approvals, rejection, unknown payment status, session isolation, reset protection, database restart, request validation, team authorization, separate workspace cookies, cross-session approval and follow-up, admin locking, protected demo controls, AG-UI stream boundaries, voice payment facts, voice version forwarding, session cleanup, officer replies, support resolution, and safe ownership records.
 - Live Sarvam-105B text generation and tool selection. The complete app tool-loop check confirms merchant credit, creates no refund, and saves the Sarvam response.
 - Live Bulbul v4 Flash audio generation.
 - Live Saaras v4 transcription of generated test speech.
 - Browser: customer history, saved conversation reload, refund recovery, exact human approval, scheduled completion, and recorded result counts.
+- Browser: separate admin inbox and case pages, retained status filter, support takeover, officer/customer message exchange, and resolution without a refund. Case details stay on the page. Portrait tablet layouts at 768 × 1024 and 820 × 1180 stack actions above evidence, with no horizontal page overflow. There is no Details drawer.
+- Browser: case details remain the main page. Floating chat opens after takeover, sends replies, and keeps an unsent draft after minimise and reopen.
 - Client bundle scan: configured Sarvam API key is absent.
 - Managed voice credentials and session URL access verified. The named tunnel exposes only authenticated voice tools; app and admin paths are blocked.
 - The latest inspected managed call used committed agent version 6. Both tool outputs included payment fields rather than the earlier generic success acknowledgment. This confirms response data delivery, not every spoken claim.
