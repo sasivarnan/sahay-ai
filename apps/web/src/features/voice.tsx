@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { api } from "@/lib/api"
+import { releaseVoiceSession } from "@/lib/voice-session"
 import { RiMicLine, RiMicOffLine, RiStopLine } from "@remixicon/react"
 import type { ConversationAgent } from "sarvam-conv-ai-sdk/browser"
 
@@ -125,11 +126,20 @@ export function ManagedVoice({
               "Voice connection interrupted. End this call and try again."
             )
             setStartedAt(null)
+            void stop()
           }
         },
         endCallback: async () => {
-          if (!isCurrent() || agent.current !== session) return
-          agent.current = null
+          if (!session) return
+          try {
+            if (!(await releaseVoiceSession(agent, session))) return
+          } catch {
+            if (isCurrent())
+              setError(
+                "Could not release the microphone. Please reload this page."
+              )
+          }
+          if (!isCurrent()) return
           setState("idle")
           setMuted(false)
           setStartedAt(null)
