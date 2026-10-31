@@ -1,0 +1,13 @@
+{
+  "name": "sahay-ai",
+  "private": true,
+  "packageManager": "pnpm@12.4.1",
+  "scripts": {
+    "dev": "pnpm --filter @sahay/web dev",
+    "build": "pnpm --filter @sahay/web build",
+    "test": "pnpm --filter @sahay/web test",
+    "worker": "pnpm --filter @sahay/web worker",
+    "tunnel:proxy": "node apps/web/scripts/voice-tunnel-proxy.mjs",
+    "tunnel": "cloudflared tunnel --url http://127.0.0.1:8788 --protocol http2"
+  }
+}
